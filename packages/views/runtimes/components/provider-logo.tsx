@@ -153,6 +153,20 @@ function AntigravityLogo({ className }: { className: string }) {
   return <img src={antigravityLogoSrc} alt="Antigravity" className={className} />;
 }
 
+// Qoder — brand mark in Qoder green (#2ADB5C), simple rounded-square logotype
+// with a stylised "Q" suitable for small icon sizes.
+function QoderLogo({ className }: { className: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <rect width="24" height="24" rx="5" fill="#0D1117" />
+      <path
+        d="M12 5.5c-3.58 0-6.5 2.92-6.5 6.5s2.92 6.5 6.5 6.5c1.28 0 2.47-.37 3.48-1.01l2.27 2.27a.75.75 0 1 0 1.06-1.06l-2.27-2.27A6.48 6.48 0 0 0 18.5 12c0-3.58-2.92-6.5-6.5-6.5zM7 12a5 5 0 1 1 10 0 5 5 0 0 1-10 0z"
+        fill="#2ADB5C"
+      />
+    </svg>
+  );
+}
+
 // Kiro CLI — official icon sourced from kiro.dev/icon.svg.
 function KiroLogo({ className }: { className: string }) {
   const maskId = `kiro-logo-mask-${useId().replace(/:/g, "")}`;
@@ -222,6 +236,8 @@ export function ProviderLogo({
       return <KimiLogo className={className} />;
     case "kiro":
       return <KiroLogo className={className} />;
+    case "qoder":
+      return <QoderLogo className={className} />;
     case "gemini":
       return <GeminiLogo className={className} />;
     case "antigravity":

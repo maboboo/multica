@@ -130,6 +130,10 @@ func ListModels(ctx context.Context, providerType, executablePath string) ([]Mod
 		return cachedDiscovery(providerType, func() ([]Model, error) {
 			return discoverKiroModels(ctx, executablePath)
 		})
+	case "qoder":
+		return cachedDiscovery(providerType, func() ([]Model, error) {
+			return discoverQoderModels(ctx, executablePath)
+		})
 	case "opencode":
 		return cachedDiscovery(discoveryCacheKey(providerType, executablePath), func() ([]Model, error) {
 			return discoverOpenCodeModels(ctx, executablePath)
@@ -727,6 +731,19 @@ func discoverKiroModels(ctx context.Context, executablePath string) ([]Model, er
 		defaultBin:   "kiro-cli",
 		clientName:   "multica-model-discovery",
 		tmpdirPrefix: "multica-kiro-discovery-",
+	})
+}
+
+// discoverQoderModels spins up a throwaway `qodercli --yolo --acp` process and
+// parses the models block Qoder returns from session/new. Qoder uses global
+// flags (`--yolo`, `--acp`) rather than an `acp` subcommand, so acpArgs is set
+// explicitly.
+func discoverQoderModels(ctx context.Context, executablePath string) ([]Model, error) {
+	return discoverACPModels(ctx, executablePath, acpDiscoveryProvider{
+		defaultBin:   "qodercli",
+		clientName:   "multica-model-discovery",
+		tmpdirPrefix: "multica-qoder-discovery-",
+		acpArgs:      []string{"--yolo", "--acp"},
 	})
 }
 
