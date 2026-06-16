@@ -3,7 +3,6 @@ package agent
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os/exec"
@@ -39,52 +38,6 @@ type qoderBackend struct {
 
 var qoderReaderDrainGrace = 2 * time.Second
 
-// convertMcpConfigForACP converts MCP server config from the Claude object-map
-// format ({"mcpServers": {"name": {...}}}) into the ACP array format
-// ([{"name": "...", "command": "...", ...}]) expected by session/new.
-func convertMcpConfigForACP(raw json.RawMessage) []any {
-	var wrapper struct {
-		McpServers map[string]json.RawMessage `json:"mcpServers"`
-	}
-	if err := json.Unmarshal(raw, &wrapper); err != nil || len(wrapper.McpServers) == 0 {
-		return nil
-	}
-	var servers []any
-	for name, cfg := range wrapper.McpServers {
-		var parsed map[string]any
-		if err := json.Unmarshal(cfg, &parsed); err != nil {
-			continue
-		}
-		entry := map[string]any{"name": name}
-		if v, ok := parsed["command"]; ok {
-			entry["command"] = v
-		}
-		if v, ok := parsed["args"]; ok {
-			entry["args"] = v
-		}
-		if envMap, ok := parsed["env"].(map[string]any); ok && len(envMap) > 0 {
-			envArr := make([]any, 0, len(envMap))
-			for k, v := range envMap {
-				envArr = append(envArr, map[string]any{"name": k, "value": fmt.Sprintf("%v", v)})
-			}
-			entry["env"] = envArr
-		} else {
-			entry["env"] = []any{}
-		}
-		// SSE / HTTP remote servers
-		if v, ok := parsed["url"]; ok {
-			entry["url"] = v
-			if t, ok := parsed["type"]; ok {
-				entry["type"] = t
-			} else {
-				entry["type"] = "sse"
-			}
-		}
-		servers = append(servers, entry)
-	}
-	return servers
-}
-
 func (b *qoderBackend) Execute(ctx context.Context, prompt string, opts ExecOptions) (*Session, error) {
 	execPath := b.cfg.ExecutablePath
 	if execPath == "" {
@@ -94,11 +47,17 @@ func (b *qoderBackend) Execute(ctx context.Context, prompt string, opts ExecOpti
 		return nil, fmt.Errorf("qoder executable not found at %q: %w", execPath, err)
 	}
 
-	timeout := opts.Timeout
-	if timeout == 0 {
-		timeout = 20 * time.Minute
+	// Translate the agent's mcp_config (Claude-style object of objects)
+	// into the array shape ACP `session/new` expects. Fail closed on
+	// malformed JSON so the launch surfaces the real error instead of
+	// silently dropping all MCP servers.
+	mcpServers, err := buildACPMcpServers(opts.McpConfig, b.cfg.Logger)
+	if err != nil {
+		return nil, fmt.Errorf("qoder: invalid mcp_config: %w", err)
 	}
-	runCtx, cancel := context.WithTimeout(ctx, timeout)
+
+	timeout := opts.Timeout
+	runCtx, cancel := runContext(ctx, timeout)
 
 	qoderArgs := append(
 		[]string{"--yolo", "--acp"},
@@ -123,7 +82,11 @@ func (b *qoderBackend) Execute(ctx context.Context, prompt string, opts ExecOpti
 		return nil, fmt.Errorf("qoder stdin pipe: %w", err)
 	}
 	providerErr := newACPProviderErrorSniffer("qoder")
-	cmd.Stderr = io.MultiWriter(newLogWriter(b.cfg.Logger, "[qoder:stderr] "), providerErr)
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("qoder stderr pipe: %w", err)
+	}
 
 	if err := cmd.Start(); err != nil {
 		cancel()
@@ -131,6 +94,13 @@ func (b *qoderBackend) Execute(ctx context.Context, prompt string, opts ExecOpti
 	}
 
 	b.cfg.Logger.Info("qoder acp started", "pid", cmd.Process.Pid, "cwd", opts.Cwd)
+
+	stderrSink := io.MultiWriter(newLogWriter(b.cfg.Logger, "[qoder:stderr] "), providerErr)
+	stderrDone := make(chan struct{})
+	go func() {
+		defer close(stderrDone)
+		_, _ = io.Copy(stderrSink, stderr)
+	}()
 
 	msgCh := make(chan Message, 256)
 	resCh := make(chan Result, 1)
@@ -203,7 +173,7 @@ func (b *qoderBackend) Execute(ctx context.Context, prompt string, opts ExecOpti
 		var finalError string
 		var sessionID string
 
-		_, err := c.request(runCtx, "initialize", map[string]any{
+		initResult, err := c.request(runCtx, "initialize", map[string]any{
 			"protocolVersion": 1,
 			"clientInfo": map[string]any{
 				"name":    "multica-agent-sdk",
@@ -218,16 +188,16 @@ func (b *qoderBackend) Execute(ctx context.Context, prompt string, opts ExecOpti
 			return
 		}
 
+		// Drop MCP entries whose remote transport the runtime didn't
+		// advertise. ACP requires the client to honour
+		// agentCapabilities.mcpCapabilities; sending an http/sse entry to
+		// a runtime that says it only supports stdio reliably rejects the
+		// whole session/new request.
+		mcpServers = filterACPMcpServersByCapability(mcpServers, extractACPMcpCapabilities(initResult), "qoder", b.cfg.Logger)
+
 		cwd := opts.Cwd
 		if cwd == "" {
 			cwd = "."
-		}
-
-		mcpServers := []any{}
-		if len(opts.McpConfig) > 0 {
-			if servers := convertMcpConfigForACP(opts.McpConfig); len(servers) > 0 {
-				mcpServers = servers
-			}
 		}
 
 		if opts.ResumeSessionID != "" {
@@ -346,6 +316,20 @@ func (b *qoderBackend) Execute(ctx context.Context, prompt string, opts ExecOpti
 			// The prompt response is already terminal, so don't block Result
 			// delivery on process shutdown; CommandContext cancellation below
 			// remains responsible for cleanup.
+		}
+		// Wait for the stderr copier as well so the provider-error sniffer
+		// has every byte the child wrote before we consult it for failure
+		// promotion. Skipping this leaves a small race where stopReason=
+		// end_turn arrives over stdout while the stderr 429 / usage-limit
+		// lines are still in transit, causing the promoted error message
+		// to fall through to the synthetic agent-text fallback.
+		select {
+		case <-stderrDone:
+			// stderr copier finished — provider error sniffer has all data
+		case <-time.After(qoderReaderDrainGrace):
+			// Process still alive; stderr goroutine will complete when
+			// cmd.Wait() kills it during deferred cleanup. Provider error
+			// sniffer may have partial data, but the result must not block.
 		}
 		// The stdout reader may still run after the grace timer; forbid further
 		// forwarding to msgCh before this goroutine's defer closes it (panic on send).
