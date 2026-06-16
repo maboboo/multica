@@ -20,7 +20,6 @@ import (
 // Cursor:   skills → {workDir}/.cursor/skills/{name}/SKILL.md  (native discovery)
 // Kimi:     skills → {workDir}/.kimi/skills/{name}/SKILL.md  (native discovery)
 // Kiro:     skills → {workDir}/.kiro/skills/{name}/SKILL.md  (native discovery)
-// Qoder:    skills → {workDir}/.qoder/skills/{name}/SKILL.md (project-level; see docs.qoder.com/cli/Skills.md)
 // Default:  skills → {workDir}/.agent_context/skills/{name}/SKILL.md
 func writeContextFiles(workDir, provider string, ctx TaskContextForEnv) error {
 	contextDir := filepath.Join(workDir, ".agent_context")
@@ -148,10 +147,6 @@ func resolveSkillsDir(workDir, provider string) (string, error) {
 		// Kiro CLI auto-discovers project-level skills from .kiro/skills/
 		// in the workdir.
 		skillsDir = filepath.Join(workDir, ".kiro", "skills")
-	case "qoder":
-		// Qoder CLI discovers project-level skills under .qoder/skills/.
-		// See https://docs.qoder.com/cli/Skills.md
-		skillsDir = filepath.Join(workDir, ".qoder", "skills")
 	default:
 		// Fallback: write to .agent_context/skills/ (referenced by meta config).
 		skillsDir = filepath.Join(workDir, ".agent_context", "skills")

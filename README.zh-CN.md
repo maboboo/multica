@@ -30,7 +30,7 @@
 
 Multica 将编码 Agent 变成真正的队友。像分配给同事一样分配给 Agent——它们会自主接手工作、编写代码、报告阻塞问题、更新状态。
 
-不再需要复制粘贴 prompt，不再需要盯着运行过程。你的 Agent 出现在看板上、参与对话、随着时间积累可复用的技能。可以理解为开源的 Managed Agents 基础设施——厂商中立、可自部署、专为人类 + AI 团队设计。支持 **Claude Code**、**Codex**、**GitHub Copilot CLI**、**OpenClaw**、**OpenCode**、**Hermes**、**Gemini**、**Pi**、**Cursor Agent**、**Kimi**、**Kiro CLI** 与 **Qoder CLI**。
+不再需要复制粘贴 prompt，不再需要盯着运行过程。你的 Agent 出现在看板上、参与对话、随着时间积累可复用的技能。可以理解为开源的 Managed Agents 基础设施——厂商中立、可自部署、专为人类 + AI 团队设计。支持 **Claude Code**、**Codex**、**GitHub Copilot CLI**、**OpenClaw**、**OpenCode**、**Hermes**、**Gemini**、**Pi**、**Cursor Agent**、**Kimi** 和 **Kiro CLI**。
 
 <p align="center">
   <img src="docs/assets/hero-screenshot.png" alt="Multica 看板视图" width="800">
@@ -111,7 +111,7 @@ multica setup          # 连接 Multica Cloud，登录，启动 daemon
 multica setup           # 配置、认证、启动 daemon（一条命令搞定）
 ```
 
-daemon 在后台运行，保持你的机器与 Multica 的连接。它会自动检测 PATH 中可用的 Agent CLI（`claude`、`codex`、`copilot`、`openclaw`、`opencode`、`hermes`、`gemini`、`pi`、`cursor-agent`、`kimi`、`kiro-cli`、`qodercli`）。
+daemon 在后台运行，保持你的机器与 Multica 的连接。它会自动检测 PATH 中可用的 Agent CLI（`claude`、`codex`、`copilot`、`openclaw`、`opencode`、`hermes`、`gemini`、`pi`、`cursor-agent`、`kimi`、`kiro-cli`）。
 
 ### 2. 确认运行时已连接
 
@@ -121,7 +121,7 @@ daemon 在后台运行，保持你的机器与 Multica 的连接。它会自动�
 
 ### 3. 创建 Agent
 
-进入 **设置 → Agents**，点击 **新建 Agent**。选择你刚连接的 Runtime，选择 Provider（Claude Code、Codex、GitHub Copilot CLI、OpenClaw、OpenCode、Hermes、Gemini、Pi、Cursor Agent、Kimi、Kiro CLI 或 Qoder CLI），并为 Agent 起个名字——它将以这个名字出现在看板、评论和任务分配中。
+进入 **设置 → Agents**，点击 **新建 Agent**。选择你刚连接的 Runtime，选择 Provider（Claude Code、Codex、GitHub Copilot CLI、OpenClaw、OpenCode、Hermes、Gemini、Pi、Cursor Agent、Kimi 或 Kiro CLI），并为 Agent 起个名字——它将以这个名字出现在看板、评论和任务分配中。
 
 ### 4. 分配你的第一个任务
 
@@ -156,7 +156,7 @@ daemon 在后台运行，保持你的机器与 Multica 的连接。它会自动�
                      │ Agent Daemon │  运行在你的机器上
                      └──────────────┘  （Claude Code、Codex、GitHub Copilot CLI、
                                         OpenCode、OpenClaw、Hermes、Gemini、
-                                        Pi、Cursor Agent、Kimi、Kiro CLI、Qoder CLI）
+                                        Pi、Cursor Agent、Kimi、Kiro CLI）
 ```
 
 | 层级 | 技术栈 |
@@ -164,7 +164,7 @@ daemon 在后台运行，保持你的机器与 Multica 的连接。它会自动�
 | 前端 | Next.js 16 (App Router) |
 | 后端 | Go (Chi router, sqlc, gorilla/websocket) |
 | 数据库 | PostgreSQL 17 with pgvector |
-| Agent 运行时 | 本地 daemon 执行 Claude Code、Codex、GitHub Copilot CLI、OpenClaw、OpenCode、Hermes、Gemini、Pi、Cursor Agent、Kimi、Kiro CLI 或 Qoder CLI |
+| Agent 运行时 | 本地 daemon 执行 Claude Code、Codex、GitHub Copilot CLI、OpenClaw、OpenCode、Hermes、Gemini、Pi、Cursor Agent、Kimi 或 Kiro CLI |
 
 ## 开发
 
